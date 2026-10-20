@@ -1,0 +1,54 @@
+1.Chuc nang them benh nhan 
+
+Buoc 1 
+người sử dụng click chuột vào nut"Them benh nhan mơi"
+trên form " Quản lý bệnh nhân" ==> hệ thống tạo ra biến "controller" có giá trị là "addPatient"
+/// <a href ="controller=addPatient" class = "btn btn-success" >Them benh nhan moi</a> 
+
+Bước 2
+Routing kiem tra Neu gia tri bien "controller" la "addPatient" thi goi phuong thuc "add()" cua "patientController"
+if ($controller=='addPatient'){$patientController->add();}
+Buoc 3
+Phuong thuc "add()" cua "patientController" thuc hien show giao dien from "Them benh nhan"
+public function add()
+{
+    include_once APP_ROOT.'/app/views/patient/add.php';
+}
+Buoc 4
+Nguoi su dung nhap thong tin benh nhan
+Buoc5
+Nguoi su dung an nut "Them" => Tao bien POST[btn_create](form them co phuong thuc POST)
+<button type="submit" class="btn btn-primary"name="btn create">Them</button>
+
+Buoc 6
+Routing kiem tra Neu gia tri bien POST[btn_create] duoc thiep lap thi goi phuowng thuc "store()" cua "patientController"
+
+Buoc 7
+public function store(){
+    $name= $_POST['name'];
+    $gender = $_POST['gender'];
+    $patient = $_POST ['patient'];
+    $patientService = new patientService();
+    $patientService->addPatient($patient);
+
+    header('Location: ?controller = home');
+}
+Buoc 8
+ham "addPatient" cua doi tuong "patientService" thuc hien insert ban ghi moi vao CSDL
+
+public function addPatient(patient $patient){
+    $dbConnection = new DBConnection();
+    if ($dbConnection != null){
+        $conn = $dbConnection->getConnection();
+        if($conn !=null){
+            $name = $patient->getFullName();
+            $gender = $patient->getGender();
+            $sql = "INSERT INTO patients (name, gender) VALUES ('$name','$gender')";
+            $conn ->exec($sql);
+        }
+    }
+
+}
+
+2.Chuc nang xóa
+

@@ -1,0 +1,386 @@
+Bước 1: Tạo Model (Đại diện cho dữ liệu)
+Tạo file app/models/Member.php.
+File này chứa một class tên Member. Bạn cần khai báo các thuộc tính bên trong tương ứng với các cột của bảng member trong database (ví dụ: $id, $name, $email...).
+Viết hàm khởi tạo (__construct) và các hàm getter/setter (getId(), getName()...) để lấy và gán dữ liệu.
+
+Bước 2: Tạo Service (Tương tác với Database)
+Tạo file app/services/MemberService.php.
+File này chịu trách nhiệm viết các câu lệnh SQL. Bạn tạo class MemberService và viết các hàm xử lý tương tự như bên PatientService:
+getAllMembers(): Dùng lệnh SELECT * FROM member để lấy danh sách.
+
+addMember($member): Dùng lệnh INSERT INTO... để thêm mới.
+
+updateMember($member): Dùng lệnh UPDATE... để sửa.
+
+deleteMember($id): Dùng lệnh DELETE... để xóa.
+
+Lưu ý: Các hàm này phải kết nối DB thông qua DbConnection.php.
+
+
+Bước 3: Tạo Controller (Điều khiển luồng dữ liệu)
+Tạo file app/controllers/MemberController.php.
+
+Trong class MemberController, bạn viết các hàm (action) để hứng request từ URL:
+
+index(): Gọi MemberService lấy danh sách, sau đó include file view danh sách.
+
+add(): Hiển thị form thêm mới. Nếu người dùng submit form (bắt qua $_POST), gọi MemberService để lưu vào DB, sau đó chuyển hướng (header('Location: ...')) về trang danh sách.
+
+edit(): Lấy ID từ URL, gọi dữ liệu cũ ra form. Nếu submit thì tiến hành cập nhật.
+
+delete(): Lấy ID từ URL, gọi hàm xóa của Service và chuyển hướng về danh sách.
+
+Bước 4: Tạo View (Giao diện người dùng)
+Tạo một thư mục mới tên là member nằm trong app/views/.
+
+Bên trong thư mục app/views/member/, tạo các file HTML/PHP tương ứng:
+
+index.php: Chứa thẻ <table> để lặp (foreach) và in danh sách member.
+
+add.php: Chứa thẻ <form> để nhập liệu, gửi dữ liệu đi bằng method="POST".
+
+edit.php: Chứa thẻ <form> giống add nhưng có sẵn giá trị (thuộc tính value) được đổ ra từ biến truyền vào.
+
+
+Bước 5: Đăng ký Controller mới vào Router (public/index.php)
+
+Mở file router chính của bạn (public/index.php).   Thêm một nhánh else if để hệ thống nhận diện được đường dẫn của member:
+
+
+
+
+
+PatientService.php
+
+<?php
+require_once APP_ROOT . '/app/models/Patient.php';
+require_once APP_ROOT . '/app/libs/DbConnection.php';
+
+class PatientService {
+
+    // 1. Lấy tất cả bệnh nhân
+    public function getAllPatients() {
+        $patients = [];
+        $dbConnection = new DBConnection();
+        $conn = $dbConnection->getConnection();
+
+        if ($conn != null) {
+            $sql = "SELECT * FROM patients ORDER BY id DESC";
+            $stmt = $conn->query($sql);
+
+            while ($row = $stmt->fetch()) {
+                // SỬA: Truyền thêm $row['phone_number'] vào class Patient
+                $patient = new Patient($row['id'], $row['name'], $row['gender'], $row['phone_number']);
+                $patients[] = $patient;
+            }
+        }
+        return $patients;
+    }
+
+    // 2. Lấy bệnh nhân theo ID
+    public function getPatientById($id) {
+        $dbConnection = new DBConnection();
+        $conn = $dbConnection->getConnection();
+
+        if ($conn != null) {
+            $sql = "SELECT * FROM patients WHERE id = :id";
+            $stmt = $conn->prepare($sql);
+            $stmt->execute(['id' => $id]);
+            $row = $stmt->fetch();
+
+            if ($row) {
+                // SỬA: Truyền thêm $row['phone_number'] vào class Patient
+                return new Patient($row['id'], $row['name'], $row['gender'], $row['phone_number']);
+            }
+        }
+        return null;
+    }
+
+    // 3. Thêm mới bệnh nhân
+    // SỬA: Thêm tham số $phoneNumber vào hàm
+    public function addPatient($name, $gender, $phoneNumber) {
+        $dbConnection = new DBConnection();
+        $conn = $dbConnection->getConnection();
+
+        if ($conn != null) {
+            // SỬA: Thêm cột phone_number vào câu lệnh INSERT
+            $sql = "INSERT INTO patients (name, gender, phone_number) VALUES (:name, :gender, :phone_number)";
+            $stmt = $conn->prepare($sql);
+            // SỬA: Truyền thêm biến vào mảng execute
+            return $stmt->execute([
+                'name' => $name, 
+                'gender' => $gender, 
+                'phone_number' => $phoneNumber
+            ]);
+        }
+        return false;
+    }
+
+    // 4. Cập nhật thông tin bệnh nhân
+    // SỬA: Thêm tham số $phoneNumber vào hàm
+    public function updatePatient($id, $name, $gender, $phoneNumber) {
+        $dbConnection = new DBConnection();
+        $conn = $dbConnection->getConnection();
+
+        if ($conn != null) {
+            // SỬA: Thêm phone_number = :phone_number vào câu lệnh UPDATE
+            $sql = "UPDATE patients SET name = :name, gender = :gender, phone_number = :phone_number WHERE id = :id";
+            $stmt = $conn->prepare($sql);
+            // SỬA: Truyền thêm biến vào mảng execute
+            return $stmt->execute([
+                'id' => $id, 
+                'name' => $name, 
+                'gender' => $gender,
+                'phone_number' => $phoneNumber
+            ]);
+        }
+        return false;
+    }
+
+    // 5. Xóa bệnh nhân (GIỮ NGUYÊN)
+    public function deletePatient($id) {
+        $dbConnection = new DBConnection();
+        $conn = $dbConnection->getConnection();
+
+        if ($conn != null) {
+            $sql = "DELETE FROM patients WHERE id = :id";
+            $stmt = $conn->prepare($sql);
+            return $stmt->execute(['id' => $id]);
+        }
+        return false;
+    }
+}
+?>
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hospital Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+</head>
+<body>
+    <div class="container">
+        <h3 class="text-center text-uppercase text-success mt-3">Quan ly benh nhan</h3>
+        <a href="<?= DOMAIN . 'app/views/patient/add.php'; ?>" class="btn btn-success mb-3">Them moi</a>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th scope="col">ID</th>
+                    <th scope="col">Full Name</th>
+                    <th scope="col">Gender</th>
+                    <!-- THÊM CỘT TIÊU ĐỀ SỐ ĐIỆN THOẠI -->
+                    <th scope="col">Phone Number</th>
+                    <th scope="col">Sua</th>
+                    <th scope="col">Xoa</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($patients as $patient): ?> 
+                    <tr>
+                        <th scope="row"><?= $patient->getID(); ?></th>
+                        <td><?= $patient->getFullName(); ?></td>
+                        <td><?= $patient->getGender(); ?></td>
+                        <!-- GỌI HÀM LẤY SỐ ĐIỆN THOẠI -->
+                        <td><?= $patient->getPhoneNumber(); ?></td>
+                        <td>
+                            <a href="<?= DOMAIN . 'app/views/patient/edit.php?id=' . $patient->getID(); ?>">
+                                <i class="bi bi-pencil-square"></i>
+                            </a>
+                        </td>
+                        <td>
+                            <a href="<?= DOMAIN . 'app/views/patient/delete.php?id=' . $patient->getID(); ?>" onclick="return confirm('Ban co chac chan muon xoa?');">
+                                <i class="bi bi-trash3"></i>
+                            </a>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+<?php
+if (!defined('APP_ROOT')) {
+    require_once __DIR__ . '/../../config/config.php';
+}
+require_once APP_ROOT . '/app/services/PatientService.php';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $name = $_POST['name'] ?? '';
+    $gender = $_POST['gender'] ?? 1;
+    // 1. NHẬN THÊM BIẾN TỪ FORM
+    $phoneNumber = $_POST['phoneNumber'] ?? '';
+
+    if (!empty($name)) {
+        $patientService = new PatientService();
+        // 2. TRUYỀN THÊM BIẾN VÀO HÀM addPatient
+        $patientService->addPatient($name, $gender, $phoneNumber);
+        header('Location: ' . DOMAIN . 'public/index.php');
+        exit();
+    }
+}
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thêm Bệnh Nhân</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="container mt-5" style="max-width: 500px;">
+    <h3 class="text-center text-uppercase text-success mb-4">Thêm mới bệnh nhân</h3>
+    <form action="" method="POST">
+        <div class="mb-3">
+            <label class="form-label">Họ và tên</label>
+            <input type="text" name="name" class="form-control" required placeholder="Nhập tên bệnh nhân">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Giới tính</label>
+            <select name="gender" class="form-select">
+                <option value="1">Nam (1)</option>
+                <option value="0">Nữ (0)</option>
+            </select>
+        </div>
+        
+        <!-- 3. THÊM Ô NHẬP SỐ ĐIỆN THOẠI -->
+        <div class="mb-3">
+            <label class="form-label">Số điện thoại</label>
+            <input type="text" name="phoneNumber" class="form-control" placeholder="Nhập số điện thoại">
+        </div>
+
+        <button type="submit" class="btn btn-success w-100">Lưu lại</button>
+        <a href="<?= DOMAIN . 'public/index.php'; ?>" class="btn btn-secondary w-100 mt-2">Hủy bỏ</a>
+    </form>
+</div>
+</body>
+</html>
+
+
+
+<?php
+if (!defined('APP_ROOT')) {
+    require_once __DIR__ . '/../../config/config.php';
+}
+require_once APP_ROOT . '/app/services/PatientService.php';
+
+$id = $_GET['id'] ?? null;
+$patientService = new PatientService();
+
+if (!$id) {
+    header('Location: ' . DOMAIN . 'public/index.php');
+    exit();
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $name = $_POST['name'] ?? '';
+    $gender = $_POST['gender'] ?? 1;
+    // 1. BẮT THÊM BIẾN SỐ ĐIỆN THOẠI
+    $phoneNumber = $_POST['phoneNumber'] ?? '';
+
+    // 2. TRUYỀN THÊM BIẾN VÀO HÀM updatePatient
+    $patientService->updatePatient($id, $name, $gender, $phoneNumber);
+    header('Location: ' . DOMAIN . 'public/index.php');
+    exit();
+}
+
+$patient = $patientService->getPatientById($id);
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sửa Bệnh Nhân</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="container mt-5" style="max-width: 500px;">
+    <h3 class="text-center text-uppercase text-warning mb-4">Chỉnh sửa bệnh nhân</h3>
+    <form action="" method="POST">
+        <div class="mb-3">
+            <label class="form-label">Họ và tên</label>
+            <input type="text" name="name" class="form-control" value="<?= htmlspecialchars($patient ? $patient->getFullName() : ''); ?>" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Giới tính</label>
+            <select name="gender" class="form-select">
+                <option value="1" <?= ($patient && $patient->getGender() == 1) ? 'selected' : ''; ?>>Nam (1)</option>
+                <option value="0" <?= ($patient && $patient->getGender() == 0) ? 'selected' : ''; ?>>Nữ (0)</option>
+            </select>
+        </div>
+
+        <!-- 3. THÊM Ô NHẬP SỐ ĐIỆN THOẠI KÈM DỮ LIỆU CŨ -->
+        <div class="mb-3">
+            <label class="form-label">Số điện thoại</label>
+            <input type="text" name="phoneNumber" class="form-control" value="<?= htmlspecialchars($patient ? $patient->getPhoneNumber() : ''); ?>" placeholder="Nhập số điện thoại">
+        </div>
+
+        <button type="submit" class="btn btn-warning w-100">Cập nhật</button>
+        <a href="<?= DOMAIN . 'public/index.php'; ?>" class="btn btn-secondary w-100 mt-2">Hủy bỏ</a>
+    </form>
+</div>
+</body>
+</html>
+
+
+Đúng vậy, quy trình hoàn toàn tương tự. Bất kể bạn thêm 1 trường, 10 trường mới, hay thay đổi tên các trường trong cơ sở dữ liệu (từ phpMyAdmin), bạn luôn áp dụng cùng một công thức đi qua các tầng của mô hình MVC.
+
+Mỗi khi cấu trúc CSDL thay đổi, đây là "bộ khung 5 bước" bạn luôn cần làm để bảo trì toàn bộ hệ thống CRUD:
+
+1. Sửa CSDL (phpMyAdmin)
+
+Thêm, sửa, hoặc xóa các cột trong bảng patients.
+
+2. Sửa Model (Class Patient.php)
+
+Khai báo thêm thuộc tính private $truong_moi;.
+
+Truyền biến đó vào trong hàm __construct().
+
+Tạo thêm hàm getTruongMoi() và setTruongMoi().
+
+3. Sửa câu lệnh SQL trong PatientService.php
+
+Hàm Read (getAll / getById): Cập nhật chỗ new Patient(...) truyền thêm $row['truong_moi'] vào cho khớp với hàm khởi tạo ở bước 2.
+
+Hàm Create (addPatient):
+
+Thêm biến mới vào tham số hàm: addPatient($name, $gender, $phoneNumber, $truongMoi)
+
+Sửa câu SQL: INSERT INTO patients (..., truong_moi) VALUES (..., :truong_moi)
+
+Thêm phần tử vào mảng $stmt->execute([...]).
+
+Hàm Update (updatePatient):
+
+Thêm biến mới vào tham số hàm.
+
+Sửa câu SQL: UPDATE patients SET ..., truong_moi = :truong_moi WHERE id = :id
+
+Thêm phần tử vào mảng $stmt->execute([...]).
+
+4. Sửa Controller / Nơi hứng dữ liệu Form (Phần đầu add.php / edit.php)
+
+Dùng $_POST['truong_moi'] ?? '' để bắt dữ liệu người dùng gửi lên.
+
+Truyền biến đó vào hàm $patientService->addPatient(...) hoặc $patientService->updatePatient(...).
+
+5. Sửa Giao diện View (HTML)
+
+Trang Danh sách (index.php): Thêm thẻ <th> (tiêu đề) và thẻ <td> (chứa $patient->getTruongMoi()) để in ra bảng.
+
+Trang Thêm (add.php): Thêm ô <input name="truong_moi"> trống.
+
+Trang Sửa (edit.php): Thêm ô <input name="truong_moi"> và in dữ liệu cũ vào thuộc tính value="<?= $patient->getTruongMoi() ?>".
+
+Chỉ cần bạn đi theo đúng trình tự từ Cơ sở dữ liệu -> Model -> Service (SQL) -> Xử lý POST -> HTML View, bạn sẽ không bao giờ bị sót biến hay gặp lỗi thiếu trường dữ liệu. Quy trình này áp dụng cho mọi Framework PHP (Laravel, CodeIgniter) hay Code PHP thuần viết theo MVC.
